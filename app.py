@@ -37,22 +37,20 @@ tasks = [
 @app.route('/todo/api/v1.0/tasks',methods=['GET'])
 def get_tasks():
 	tasks = Task.objects.all()
-	tasks_ser= serializers.serialize('json',tasks)
-	#gen = [c['fields'] for c in tasks_ser]
-	dictionaries = [ task.as_dict() for task in tasks ]
-	#return HttpResponse(json.dumps({"data": dictionaries}), content_type='application/json')
-	#return HttpResponse(json.dumps({"data": dictionaries}), content_type='application/json')
+	tasks_pub = (make_public_task(task) for task in tasks)
+	dictionaries = [ task.as_dict() for task in tasks_pub]
 	return jsonify({'tasks': dictionaries})
-	#return jsonify({'tasks':[make_public_task(task) for task in tasks]})
-	
+		
 @app.route('/todo/api/v1.0/tasks/<int:taskid>',methods=['GET'])
 def get_task(taskid):
 	tasks = Task.objects.all()
 	task = [task for task in tasks if task.id == taskid]
-	print "Get Task"
+	#print "Get Task"
 	if len(task) == 0:
 		abort(404) 
-	return jsonify({'tasks':make_public_task(task[0])})
+	task_pub = make_public_task(task[0])
+	dictionaries = [task_pub.as_dict()]
+	return jsonify({'tasks':dictionaries})
 
 @app.errorhandler(404)
 def not_found(error):
@@ -69,22 +67,22 @@ def create_task():
 	if not request.json or not 'title' in request.json:
 		abort(400)
 	
-	max = Task.objects.all().aggregate(Max('id'))['rating__max']
+	max = Task.objects.all().aggregate(Max('id'))['id__max']
 	db_task = Task.objects.create(id = max+1,
 					title = request.json['title'],
 					description=request.json.get('description',""),
 					done=False)
-	#print task
-	#tasks.append(task)
+
 	db_task.save()
-	return jsonify({'tasks':tasks})
+	task_pub = make_public_task(db_task)
+	dictionaries = [ task_pub.as_dict()]
+	return jsonify({'tasks':dictionaries})
 	
 @app.route('/todo/api/v1.0/tasks/<int:taskid>', methods=['PUT'])
 def update_task(taskid):
 	tasks = Task.objects.all()
 	task = [task for task in tasks if taskid == task.id]
-	#print task,len(task)
-	#print request.json['title']
+	
 	if not len(task):
 		abort(404)
 	if not request.json:
@@ -95,27 +93,29 @@ def update_task(taskid):
 		abort(400)
 	if 'done' in request.json and type(request.json[u'done']) is not bool:
 		abort(400)
-	#print task
+	task = task[0]
 	task.title = request.json.get(u'title',task.title)
 	task.description = request.json.get(u'description',task.description)
 	task.done = request.json.get(u'done',task.done )
-
-	return jsonify({'task':task})
+	task.save()
+	task_pub = make_public_task(task)
+	dictionaries = [ task_pub.as_dict()]
+	return jsonify({'task':dictionaries})
 
 @app.route('/todo/api/v1.0/tasks/<int:taskid>', methods=['DELETE'])
 def delete_task(taskid):
+	tasks = Task.objects.all()
 	task = [task for task in tasks if taskid == task.id]
 	
 	if not len(task):
 		abort(404)
-	task.delete()
+	task[0].delete()
 	return jsonify({'result':True})
 	
 from flask import url_for
 
 def make_public_task(task):
 	new_task = copy.deepcopy(task)
-	print "Here"
 
 	new_task.uri = url_for('get_task',taskid=task.id,_external=True)
 		

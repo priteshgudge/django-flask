@@ -27,11 +27,14 @@ class Task(models.Model):
 	done = models.BooleanField()
 	
 	def as_dict(self):
+		if not self.uri:
+			self.uri = ""
 		return {
             "id": self.id,
             "title": self.title,
             "description": self.description,
             "done": self.done,
+            "uri": self.uri 
         	}
 	
 	def __unicode__(self):
